@@ -1,0 +1,162 @@
+(footprint "SSR-41FDA"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -3.6 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "f697c02d-13c2-43e5-a142-2279e4e05631")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "SSR-41FDA"
+		(at 0 4 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "ad0f2fa7-954e-4455-94b7-00852d75c9e7")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "375e630d-090c-4a05-8c05-00af5d6c6d82")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "d2676084-12b2-4dd0-98aa-eb5d268a9c8b")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_rect
+		(start -14.1 -2.6)
+		(end 14.1 2.6)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "b7c9a189-88ad-45d6-b475-bdd2312728bc")
+	)
+	(fp_circle
+		(center 15 -1.5)
+		(end 15.2 -1.5)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill yes)
+		(layer "F.SilkS")
+		(uuid "3b892dc1-22b4-4c61-b4b3-cb21133b5e09")
+	)
+	(fp_rect
+		(start -14.3 -3)
+		(end 14.3 3)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "c9d0d13d-51a0-4eac-bb82-b323c87133db")
+	)
+	(fp_rect
+		(start -14 -2.5)
+		(end 14 2.5)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+		(uuid "ea8c7e8e-3d60-4539-bb2d-49535a010dc9")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 5.5 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "487b58a1-c8a9-4b79-bd13-6ce654a94bdd")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" thru_hole roundrect
+		(at 12.1 -1.3)
+		(size 3 2)
+		(drill oval 2 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(roundrect_rratio 0.15)
+		(uuid "7fb42082-b44c-42df-9714-ccf8fcb59613")
+	)
+	(pad "2" thru_hole roundrect
+		(at 7.06 -1.3)
+		(size 3 2)
+		(drill oval 2 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(roundrect_rratio 0.15)
+		(uuid "6a6c88cf-1d65-4813-b20b-f5c895a6c7ac")
+	)
+	(pad "3" thru_hole roundrect
+		(at -9.32 -1.3)
+		(size 1.8 2)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(roundrect_rratio 0.15)
+		(uuid "216d511b-0702-49ab-9afb-c01a843c8cf9")
+	)
+	(pad "4" thru_hole roundrect
+		(at -13.1 -1.3)
+		(size 1.8 2)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(roundrect_rratio 0.15)
+		(uuid "c7f08731-fabc-480c-be00-534774c4230c")
+	)
+	(embedded_fonts no)
+	(model "D:/Projects/IS.SmartHome/FreeCAD/SSR_41FDA.step"
+		(offset
+			(xyz -14 -2.5 -0.5)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz -0 -0 -0)
+		)
+	)
+)

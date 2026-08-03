@@ -1,0 +1,4 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "IS.SmartHome") (type "KiCad") (uri "${KIPRJMOD}/IS.SmartHome.pretty") (options "") (descr ""))
+)

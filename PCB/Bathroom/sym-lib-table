@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "IS.SmartHome") (type "KiCad") (uri "${KIPRJMOD}/Symbols/IS.SmartHome.kicad_sym") (options "") (descr ""))
+)
