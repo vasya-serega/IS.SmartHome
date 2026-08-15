@@ -18,6 +18,7 @@ class NetManager
     void connect();
     bool isConnected();
     bool tryReconnect();
+    bool tryConnectWithCredentials(const String &ssid, const String &password);
     std::vector<WiFiNetworkInfo> scanNetworks();
 private:
     Configuration &_config;

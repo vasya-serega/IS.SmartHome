@@ -220,22 +220,28 @@ HttpResponse WebService::handleSetWifi(std::map<String, String> headers, String 
   String ssid = state["SSID"];
   String password = state["Password"];
 
-  _config.setWiFiConnectionData(ssid, password);
-
-  Logger::notice("Attempting to connect to WiFi network:", ssid.c_str());
-  bool connected = _netManager.tryReconnect();
+  bool connected = _netManager.tryConnectWithCredentials(ssid, password);
 
   JsonDocument resultJson;
   resultJson["Connected"] = connected;
-  if (!connected)
+
+  if (connected)
+  {
+    _config.setWiFiConnectionData(ssid, password);
+    Logger::notice("WiFi connection succeeded; credentials saved. SSID:", ssid.c_str());
+  }
+  else
   {
     resultJson["Error"] = "Unable to connect. Check the password and try again.";
+    Logger::notice("WiFi connection failed; credentials were not saved. SSID:", ssid.c_str());
+
+    // Attempt to restore whatever connection was working before this attempt,
+    // since the new (failed) credentials were never persisted.
+    _netManager.tryReconnect();
   }
 
   String resultBody = "";
   serializeJson(resultJson, resultBody);
-
-  Logger::notice(connected ? "WiFi connection succeeded. SSID:" : "WiFi connection failed. SSID:", ssid.c_str());
 
   HttpResponse response;
   response.code = 200;
@@ -347,6 +353,15 @@ String WebService::htmlPageOpen(const char *title)
       ".field-group label{"
       "color:var(--muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;"
       "}"
+      ".field-group .label-row{"
+      "display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"
+      "}"
+      ".refresh-btn{"
+      "background:transparent;color:var(--accent);border:1px solid #334155;"
+      "border-radius:8px;padding:4px 10px;font-size:0.72rem;cursor:pointer;"
+      "}"
+      ".refresh-btn:active{opacity:0.7;}"
+      ".refresh-btn:disabled{opacity:0.5;cursor:default;}"
       ".field-group input[type=text],"
       ".field-group input[type=password],"
       ".field-group select{"
@@ -559,7 +574,7 @@ String WebService::createWiFiPage()
   auto networks = _netManager.scanNetworks(); // blocking scan, runs on every page load
 
   String page;
-  page.reserve(4352);
+  page.reserve(4480);
 
   page += htmlPageOpen("Wi-Fi Configuration");
   page += htmlPageHeader();
@@ -569,7 +584,10 @@ String WebService::createWiFiPage()
             "<div class='sublabel'>Select the wireless network to connect this device to</div>"
             "<form class='wifi-form' id='wifiForm'>"
             "<div class='field-group'>"
+            "<div class='label-row'>"
             "<label for='ssidSelect'>Network name (SSID)</label>"
+            "<button type='button' id='refreshBtn' class='refresh-btn'>&#8635; Refresh</button>"
+            "</div>"
             "<select id='ssidSelect' name='SSID' required>");
 
   if (networks.empty())
@@ -583,7 +601,7 @@ String WebService::createWiFiPage()
     {
       if (network.isCurrentAp)
       {
-        continue; // don't offer the device's own fallback AP as a target
+        continue;
       }
 
       String escapedSsid = htmlAttributeEscape(network.ssid);
@@ -610,8 +628,6 @@ String WebService::createWiFiPage()
 
     if (!hasSelectedMatch && currentSsid.length() > 0)
     {
-      // Configured network wasn't seen in this scan (out of range, hidden, etc.) —
-      // still offer it so the form doesn't silently switch to a different network.
       String escapedCurrent = htmlAttributeEscape(currentSsid);
       page += F("<option value='");
       page += escapedCurrent;
@@ -636,9 +652,14 @@ String WebService::createWiFiPage()
             "</div>");
 
   String script;
-  script.reserve(1536);
+  script.reserve(1664);
   script += F(
       "<script>"
+      "document.getElementById('refreshBtn').addEventListener('click', function(){"
+      "this.disabled=true;"
+      "this.textContent='Scanning...';"
+      "location.reload();"
+      "});"
       "document.getElementById('wifiForm').addEventListener('submit', function(e){"
       "e.preventDefault();"
       "var msg=document.getElementById('wifiMsg');"

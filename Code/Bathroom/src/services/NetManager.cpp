@@ -2,6 +2,7 @@
 #include <Logger.h>
 #include <WiFi.h>
 #include <algorithm>
+#include "hardware/watchdog.h"
 #include "../include/services/NetManager.h"
 
 NetManager::NetManager(Configuration &config)
@@ -28,6 +29,7 @@ void NetManager::connect()
     unsigned long start = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - start < connectTimeoutMs)
     {
+        watchdog_update();
         delay(250);
     }
 
@@ -51,43 +53,42 @@ bool NetManager::tryReconnect()
     }
 
     Logger::notice("Trying to reconnect to WiFi network...");
-    WiFi.disconnect();
+    return tryConnectWithCredentials(_config.getWiFiSsid(), _config.getWiFiPassword());
+}
 
-    auto ssid = _config.getWiFiSsid();
-    auto password = _config.getWiFiPassword();
-
+bool NetManager::tryConnectWithCredentials(const String &ssid, const String &password)
+{
     if (ssid.isEmpty())
     {
         Logger::warning("WiFi SSID is empty. Cannot connect.");
         return false;
     }
 
+    Logger::notice("Attempting to connect to WiFi network: ", ssid.c_str());
+    WiFi.disconnect();
     WiFi.begin(ssid.c_str(), password.c_str());
 
     const unsigned long connectTimeoutMs = 15000;
     unsigned long start = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - start < connectTimeoutMs)
     {
+        watchdog_update();
         delay(250);
     }
 
     if (WiFi.status() == WL_CONNECTED)
     {
-        Logger::notice("Reconnected to WiFi network: ", ssid.c_str());
+        Logger::notice("Connected to WiFi network: ", ssid.c_str());
         Logger::notice("Pico W IP Address: ", WiFi.localIP().toString().c_str());
         return true;
     }
-    else
-    {
-        Logger::error("Failed to reconnect to WiFi network: ", ssid.c_str());
-        return false;
-    }
+
+    Logger::error("Failed to connect to WiFi network: ", ssid.c_str());
+    return false;
 }
 
 bool NetManager::isConnected()
 {
-    // Reflects the outer (station) WiFi connection only — the local fallback
-    // Access Point running alongside it does not count as "connected" here.
     return WiFi.status() == WL_CONNECTED;
 }
 
@@ -96,7 +97,9 @@ std::vector<WiFiNetworkInfo> NetManager::scanNetworks()
     std::vector<WiFiNetworkInfo> networks;
 
     Logger::notice("Scanning for WiFi networks...");
+    watchdog_update(); // scanNetworks() is a single opaque blocking call; pet just before it
     int foundCount = WiFi.scanNetworks();
+    watchdog_update();
 
     if (foundCount <= 0)
     {
