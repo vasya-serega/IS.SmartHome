@@ -10,8 +10,6 @@ FanService::FanService(Configuration &config, StateService &stateService) : _con
 
 void FanService::init()
 {
-    _config.init();
-    
     gpio_set_input_enabled(RelayPin, true);
 
     _sensorTimer.attachInterruptInterval(FanInterval, timerHandlerWrapper);

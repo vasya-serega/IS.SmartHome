@@ -1,18 +1,19 @@
 #include <Arduino.h>
-#include "HttpServer.h"
+#include "HttpServerW.h"
 #include "HttpParser.h"
 #include "Configuration.h"
 
 using namespace Rp2040;
 
 HttpResponse handleRequest(HttpRequest request);
-HttpServer httpServer;
+HttpServerW httpServer;
 
 void setup()
 {
     Serial.begin(115200);
     Serial.println("init started");
-    httpServer.init(const_cast<unsigned char *>(Configuration::serverIp));
+    //httpServer.init(const_cast<unsigned char *>(Configuration::serverIp));
+    httpServer.init(80);
     Serial.println("init finished");
 }
 

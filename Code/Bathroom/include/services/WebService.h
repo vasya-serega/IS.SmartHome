@@ -1,8 +1,9 @@
 #pragma once
 
-#include <HttpServer.h>
+#include "../include/httpServer/WiFiHttpServer.h"
 #include "Configuration.h"
 #include "FanService.h"
+#include "NetManager.h"
 
 enum HtmlPageType
 {
@@ -10,28 +11,31 @@ enum HtmlPageType
     WiFiPage
 };
 
-class WebService : public Rp2040::IHttpHandler
+class WebService : public Rp2040::IWiFiHttpServer
 {
 public:
-    WebService(Configuration &config, FanService &fanService, StateService &stateService);
-    void init();
+    WebService(Configuration &config, FanService &fanService, StateService &stateService, NetManager &netManager);
+    void init(uint16_t port = 80);
     void loop();
-    Rp2040::HttpResponse handle(const Rp2040::HttpRequest &request) override;
+    Rp2040::HttpResponse handleHttpRequest(const Rp2040::HttpRequest &request) override;
 
 private:
     Configuration &_config;
     FanService &_fanService;
     StateService &_stateService;
-    Rp2040::HttpServer _httpServer = Rp2040::HttpServer(Rp2040::DeviceModel::W5500EvbPico);
+    NetManager &_netManager;
+    Rp2040::WiFiHttpServer _httpServer;
 
-    Rp2040::HttpResponse HandleGetMethods(String request);
-    Rp2040::HttpResponse HandlePostMethods(String methodName, std::map<String, String> headers, String body);
-    Rp2040::HttpResponse NotSupportedMethodError();
-    static std::map<String, String> GetHeaders(unsigned int contentLenght);
+    static std::map<String, String> buildHeaders(unsigned int contentLength);
+    static std::map<String, String> buildJsonHeaders(unsigned int contentLength);
+    Rp2040::HttpResponse handleGetMethods(const String &request);
+    Rp2040::HttpResponse handlePostMethods(const String &methodName, std::map<String, String> headers, String body);
+    static Rp2040::HttpResponse notFoundMethodError(const String &methodName);
+    static Rp2040::HttpResponse notSupportedMethodError();
+    static Rp2040::HttpResponse redirectResponse(const String &location);
     Rp2040::HttpResponse getDeviceState();
     Rp2040::HttpResponse getGeneralInfo();
     Rp2040::HttpResponse getHtmlPage(HtmlPageType pageType = HtmlPageType::ManagementPage);
-    static Rp2040::HttpResponse notFoundMethodError(String methodName);
     Rp2040::HttpResponse handleSetHumidityThreshold(std::map<String, String> headers, String body);
     Rp2040::HttpResponse handleSetWifi(std::map<String, String> headers, String body);
     String createManagementPage();

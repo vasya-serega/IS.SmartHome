@@ -2,15 +2,21 @@
 #include <WiFiClient.h>
 #include "HttpParser.h"
 
-void Rp2040::Cyw43439Server::init(uint8_t serverIp[4], uint16_t port)
-{
-    IPAddress ip(serverIp);
-    _server = std::make_shared<WiFiServer>(ip, port);
+// void Rp2040::Cyw43439Server::init(uint8_t serverIp[4], uint16_t port)
+// {
+//     IPAddress ip(serverIp);
+//     _server = std::make_shared<WiFiServer>(ip, port);
 
-    _server->begin();
-}
+//     _server->begin();
+// }
 
-void Rp2040::Cyw43439Server::init(String mdnsHostname, String mdnsServiceName, uint16_t port)
+// void Rp2040::Cyw43439Server::init(String mdnsHostname, String mdnsServiceName, uint16_t port)
+// {
+//     _server = std::make_shared<WiFiServer>(port);
+//     _server->begin();
+// }
+
+void Rp2040::Cyw43439Server::init(uint16_t port)
 {
     _server = std::make_shared<WiFiServer>(port);
     _server->begin();
@@ -64,7 +70,6 @@ void Rp2040::Cyw43439Server::sendResponse(WiFiClient client, HttpResponse respon
     client.println(response.toString());
 }
 
-
 void Rp2040::Cyw43439Server::handleRequest(IHttpHandler *handler)
 {
     WiFiClient client = _server->accept();
@@ -74,6 +79,7 @@ void Rp2040::Cyw43439Server::handleRequest(IHttpHandler *handler)
     }
 
     String rawRequest = getRawRequest(client);
+    Serial.println("Raw request: " + rawRequest);
     if (handler != NULL)
     {
         HttpRequest request = Rp2040::HttpParser::getHttpRequest(rawRequest);
@@ -102,5 +108,9 @@ void Rp2040::Cyw43439Server::handleRequest(HttpResponse (*callback)(HttpRequest)
 
         delay(1);
         client.stop();
+    }
+    else
+    {
+        Serial.println("Callback is NULL");
     }
 }

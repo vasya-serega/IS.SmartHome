@@ -10,6 +10,10 @@ class Configuration
         static constexpr uint8_t serverIp[4] = {192, 168, 198, 127};
         static constexpr const char* mdnsHostname = "is-bathroom";
 
+        static constexpr const char* localSsid = "IS-bathroom.AP";
+        static constexpr const char* localPassword = "12345678";
+        static constexpr uint8_t localServerIp[4] = {192, 168, 4, 1};
+
         uint8_t getHumidityThreshold() const;
         String getWiFiSsid() const;
         String getWiFiPassword() const;

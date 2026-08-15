@@ -4,50 +4,91 @@
 
 using namespace Rp2040;
 
-WebService::WebService(Configuration &config, FanService &fanService, StateService &stateService)
-    : _config(config), _fanService(fanService), _stateService(stateService)
+WebService::WebService(Configuration &config, FanService &fanService, StateService &stateService, NetManager &netManager)
+    : _config(config), _fanService(fanService), _stateService(stateService), _netManager(netManager)
 {
 }
 
-void WebService::init()
+void WebService::init(uint16_t port)
 {
-  _httpServer.init(const_cast<unsigned char *>(Configuration::serverIp));
-  Serial.println("Http server initialized");
+  _httpServer.init(this, port);
+  Logger::verbose("WiFi HTTP server initialized");
 }
 
 void WebService::loop()
 {
-  // add DNS call here
-  _httpServer.handleRequest(this);
+  _httpServer.loop();
 }
 
-Rp2040::HttpResponse WebService::handle(const Rp2040::HttpRequest &request)
+HttpResponse WebService::handleHttpRequest(const HttpRequest &request)
 {
-  HttpResponse response;
-  switch (request.methodType)
-  {
-  case HttpMethodType::GET:
-    response = HandleGetMethods(request.methodName);
-    break;
-  case HttpMethodType::POST:
-    response = HandlePostMethods(request.methodName, request.headers, request.body);
-    break;
-  default:
-    response = NotSupportedMethodError();
-    break;
-  }
-
-  return response;
+  Logger::notice("WebService. handle. MethodName:", request.methodName.c_str());
+    switch (request.methodType)
+    {
+    case HttpMethodType::GET:
+        return handleGetMethods(request.methodName);
+    case HttpMethodType::POST:
+        return handlePostMethods(request.methodName, request.headers, request.body);
+    default:
+        return notSupportedMethodError();
+    }
 }
 
-HttpResponse WebService::HandleGetMethods(String methodName)
+std::map<String, String> WebService::buildHeaders(unsigned int contentLength)
+{
+    std::map<String, String> headers;
+    headers["Content-Type"] = "text/html";
+    headers["Content-Length"] = String(contentLength);
+    headers["Connection"] = "close";
+
+    return headers;
+}
+
+std::map<String, String> WebService::buildJsonHeaders(unsigned int contentLength)
+{
+    std::map<String, String> headers;
+    headers["Content-Type"] = "application/json";
+    headers["Content-Length"] = String(contentLength);
+    headers["Connection"] = "close";
+
+    return headers;
+}
+
+Rp2040::HttpResponse WebService::notFoundMethodError(const String &methodName)
+{
+    Rp2040::HttpResponse response;
+    response.code = 404;
+    response.codeDescription = "Not Found";
+    response.headers = buildHeaders(0);
+    response.body = "";
+
+    return response;
+}
+
+Rp2040::HttpResponse WebService::redirectResponse(const String &location)
+{
+    Rp2040::HttpResponse response;
+    response.code = 302;
+    response.codeDescription = "Found";
+    response.headers = buildHeaders(0);
+    response.headers["Location"] = location;
+    response.body = "";
+
+    return response;
+}
+
+HttpResponse WebService::handleGetMethods(const String &methodName)
 {
   if (methodName == "")
   {
+    if (!_netManager.isConnected())
+    {
+      return redirectResponse("/ConfigWiFi");
+    }
     return getHtmlPage();
   }
 
-  if (methodName == "SetWiFi")
+  if (methodName == "ConfigWiFi")
   {
     return getHtmlPage(HtmlPageType::WiFiPage);
   }
@@ -65,7 +106,7 @@ HttpResponse WebService::HandleGetMethods(String methodName)
   return notFoundMethodError(methodName);
 }
 
-HttpResponse WebService::HandlePostMethods(String methodName, std::map<String, String> headers, String body)
+HttpResponse WebService::handlePostMethods(const String &methodName, std::map<String, String> headers, String body)
 {
   if (methodName == "SetHumidityThreshold")
   {
@@ -80,27 +121,16 @@ HttpResponse WebService::HandlePostMethods(String methodName, std::map<String, S
   return notFoundMethodError(methodName);
 }
 
-HttpResponse WebService::NotSupportedMethodError()
+HttpResponse WebService::notSupportedMethodError()
 {
   HttpResponse response;
   response.code = 405;
   response.codeDescription = "Method Not Allowed";
-  response.headers = GetHeaders(0);
+  response.headers = buildHeaders(0);
   response.headers["Allow"] = "GET,POST";
   response.body = "";
 
   return response;
-}
-
-std::map<String, String> WebService::GetHeaders(unsigned int contentLenght)
-{
-  std::map<String, String> headers;
-  headers["Content-Type"] = "text/html";
-  String contentLenghtStr(contentLenght);
-  headers["Content-Length"] = contentLenghtStr;
-  headers["Connection"] = "close";
-
-  return headers;
 }
 
 HttpResponse WebService::getDeviceState()
@@ -116,7 +146,7 @@ HttpResponse WebService::getDeviceState()
   HttpResponse response;
   response.code = 200;
   response.codeDescription = "OK";
-  response.headers = GetHeaders(body.length());
+  response.headers = buildHeaders(body.length());
   response.body = body;
 
   Logger::notice("RemoteService. Current state was requested." /*, body.c_str()*/);
@@ -138,7 +168,7 @@ HttpResponse WebService::getGeneralInfo()
   HttpResponse response;
   response.code = 200;
   response.codeDescription = "OK";
-  response.headers = GetHeaders(body.length());
+  response.headers = buildHeaders(body.length());
   response.body = body;
 
   return response;
@@ -153,7 +183,7 @@ HttpResponse WebService::getHtmlPage(HtmlPageType pageType)
   HttpResponse response;
   response.code = 200;
   response.codeDescription = "OK";
-  response.headers = GetHeaders(body.length());
+  response.headers = buildHeaders(body.length());
   response.body = body;
 
   auto notification = pageType == HtmlPageType::ManagementPage ? 
@@ -176,7 +206,7 @@ HttpResponse WebService::handleSetHumidityThreshold(std::map<String, String> hea
   HttpResponse response;
   response.code = 204;
   response.codeDescription = "No Content";
-  response.headers = GetHeaders(0);
+  response.headers = buildHeaders(0);
 
   return response;
 }
@@ -192,11 +222,26 @@ HttpResponse WebService::handleSetWifi(std::map<String, String> headers, String 
 
   _config.setWiFiConnectionData(ssid, password);
 
-  Logger::notice("WiFi connection data is set. SSID:", ssid.c_str());
+  Logger::notice("Attempting to connect to WiFi network:", ssid.c_str());
+  bool connected = _netManager.tryReconnect();
+
+  JsonDocument resultJson;
+  resultJson["Connected"] = connected;
+  if (!connected)
+  {
+    resultJson["Error"] = "Unable to connect. Check the password and try again.";
+  }
+
+  String resultBody = "";
+  serializeJson(resultJson, resultBody);
+
+  Logger::notice(connected ? "WiFi connection succeeded. SSID:" : "WiFi connection failed. SSID:", ssid.c_str());
+
   HttpResponse response;
-  response.code = 204;
-  response.codeDescription = "No Content";
-  response.headers = GetHeaders(0);
+  response.code = 200;
+  response.codeDescription = "OK";
+  response.headers = buildJsonHeaders(resultBody.length());
+  response.body = resultBody;
 
   return response;
 }
@@ -208,7 +253,7 @@ HttpResponse WebService::handleSetWifi(std::map<String, String> headers, String 
 String WebService::htmlPageOpen(const char *title)
 {
   String head;
-  head.reserve(3200);
+  head.reserve(3300);
 
   head += F(
       "<!DOCTYPE html>"
@@ -303,9 +348,11 @@ String WebService::htmlPageOpen(const char *title)
       "color:var(--muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;"
       "}"
       ".field-group input[type=text],"
-      ".field-group input[type=password]{"
+      ".field-group input[type=password],"
+      ".field-group select{"
       "background:var(--field);color:var(--text);border:1px solid #334155;"
       "border-radius:10px;padding:10px 12px;font-size:1rem;width:100%;"
+      "-webkit-appearance:none;appearance:none;"
       "}"
       ".wifi-form button{"
       "background:var(--accent);color:#04202e;border:none;border-radius:10px;"
@@ -400,10 +447,12 @@ String WebService::createManagementPage()
   const char *fanStatusClass = isFanTurnedOn ? "on" : "off";
 
   String page;
-  page.reserve(5376); // avoid repeated reallocations
+  page.reserve(5504); // avoid repeated reallocations
 
   page += htmlPageOpen("Climate Control");
   page += htmlPageHeader();
+
+  page += F("<a class='backlink' href='/ConfigWiFi'>Wi-Fi settings</a>");
 
   page += F("<div class='grid'>");
 
@@ -506,54 +555,107 @@ String WebService::createManagementPage()
 
 String WebService::createWiFiPage()
 {
-  String currentSsid = htmlAttributeEscape(_config.getWiFiSsid());
+  String currentSsid = _config.getWiFiSsid();
+  auto networks = _netManager.scanNetworks(); // blocking scan, runs on every page load
 
   String page;
-  page.reserve(3584);
+  page.reserve(4352);
 
   page += htmlPageOpen("Wi-Fi Configuration");
   page += htmlPageHeader();
 
   page += F("<div class='panel'>"
-            "<a class='backlink' href='/'>&larr; Back to dashboard</a>"
             "<div class='label'>Wi-Fi configuration</div>"
-            "<div class='sublabel'>Connect the device to your home wireless network</div>"
+            "<div class='sublabel'>Select the wireless network to connect this device to</div>"
             "<form class='wifi-form' id='wifiForm'>"
             "<div class='field-group'>"
-            "<label for='ssidInput'>Network name (SSID)</label>"
-            "<input type='text' id='ssidInput' name='SSID' maxlength='32' "
-            "autocomplete='off' autocapitalize='off' spellcheck='false' value='");
-  page += currentSsid;
-  page += F("' required>"
+            "<label for='ssidSelect'>Network name (SSID)</label>"
+            "<select id='ssidSelect' name='SSID' required>");
+
+  if (networks.empty())
+  {
+    page += F("<option value='' disabled selected>No networks found</option>");
+  }
+  else
+  {
+    bool hasSelectedMatch = false;
+    for (const auto &network : networks)
+    {
+      if (network.isCurrentAp)
+      {
+        continue; // don't offer the device's own fallback AP as a target
+      }
+
+      String escapedSsid = htmlAttributeEscape(network.ssid);
+      bool isSelected = (network.ssid == currentSsid);
+      if (isSelected)
+      {
+        hasSelectedMatch = true;
+      }
+
+      page += F("<option value='");
+      page += escapedSsid;
+      page += F("'");
+      if (isSelected)
+      {
+        page += F(" selected");
+      }
+      page += F(">");
+      page += escapedSsid;
+      page += network.isOpen ? F(" (open)") : F(" (secured)");
+      page += F(" &middot; ");
+      page += String(network.rssi);
+      page += F(" dBm</option>");
+    }
+
+    if (!hasSelectedMatch && currentSsid.length() > 0)
+    {
+      // Configured network wasn't seen in this scan (out of range, hidden, etc.) —
+      // still offer it so the form doesn't silently switch to a different network.
+      String escapedCurrent = htmlAttributeEscape(currentSsid);
+      page += F("<option value='");
+      page += escapedCurrent;
+      page += F("' selected>");
+      page += escapedCurrent;
+      page += F(" (currently configured, not in range)</option>");
+    }
+  }
+
+  page += F("</select>"
             "</div>"
             "<div class='field-group'>"
             "<label for='passwordInput'>Password</label>"
             "<input type='password' id='passwordInput' name='Password' maxlength='63' "
-            "autocomplete='off' placeholder='Leave blank to keep current password'>"
+            "autocomplete='off' placeholder='Leave blank for open networks'>"
             "</div>"
             "<button type='submit'>Save &amp; connect</button>"
             "</form>"
             "<div class='set-msg' id='wifiMsg'></div>"
+            "<a id='dashboardLink' class='backlink' href='/' "
+            "style='display:none;margin-top:10px;'>Go to dashboard &rarr;</a>"
             "</div>");
 
   String script;
-  script.reserve(1024);
+  script.reserve(1536);
   script += F(
       "<script>"
       "document.getElementById('wifiForm').addEventListener('submit', function(e){"
       "e.preventDefault();"
       "var msg=document.getElementById('wifiMsg');"
-      "var ssid=document.getElementById('ssidInput').value.trim();"
+      "var link=document.getElementById('dashboardLink');"
+      "link.style.display='none';"
+      "var select=document.getElementById('ssidSelect');"
+      "var ssid=select.value;"
       "var password=document.getElementById('passwordInput').value;"
-      "if(ssid.length===0){"
-      "msg.textContent='Network name cannot be empty.';"
+      "if(!ssid){"
+      "msg.textContent='Please select a network.';"
       "msg.className='set-msg err';"
       "return;"
       "}"
-      "msg.textContent='Saving...';"
+      "msg.textContent='Connecting...';"
       "msg.className='set-msg';"
       "var controller=new AbortController();"
-      "var timeoutId=setTimeout(function(){ controller.abort(); }, 5000);"
+      "var timeoutId=setTimeout(function(){ controller.abort(); }, 20000);"
       "fetch('SetWifi',{"
       "method:'POST',"
       "headers:{'Content-Type':'application/json'},"
@@ -562,8 +664,16 @@ String WebService::createWiFiPage()
       "}).then(function(r){"
       "clearTimeout(timeoutId);"
       "if(!r.ok) throw new Error('HTTP '+r.status);"
-      "msg.textContent='Wi-Fi settings saved. The device will attempt to reconnect.';"
+      "return r.json();"
+      "}).then(function(data){"
+      "if(data.Connected){"
+      "msg.textContent='Connected successfully.';"
       "msg.className='set-msg ok';"
+      "link.style.display='inline-block';"
+      "}else{"
+      "msg.textContent=data.Error||'Failed to connect. Please try again.';"
+      "msg.className='set-msg err';"
+      "}"
       "}).catch(function(err){"
       "clearTimeout(timeoutId);"
       "msg.textContent='Failed to save Wi-Fi settings: '+(err.name==='AbortError'?'timed out':err.message);"
@@ -575,15 +685,4 @@ String WebService::createWiFiPage()
   page += htmlPageClose(script);
 
   return page;
-}
-
-HttpResponse WebService::notFoundMethodError(String methodName)
-{
-  HttpResponse response;
-  response.code = 404;
-  response.codeDescription = "Not Found";
-  response.headers = GetHeaders(0);
-  response.body = "";
-
-  return response;
 }

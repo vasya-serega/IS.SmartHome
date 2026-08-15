@@ -32,7 +32,7 @@ void Configuration::init()
     initThresholdFileAndValue();
     initWiFiFileAndValue();
 
-    Logger::notice("read initail value:", String(_humidityThreshold).c_str());
+    Logger::notice("Read initial value of humidity threshold:", String(_humidityThreshold).c_str());
 }
 
 const String Configuration::serverIpString()
